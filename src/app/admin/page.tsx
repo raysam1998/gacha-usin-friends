@@ -20,6 +20,12 @@ export default async function AdminPage() {
 
   if (!profile?.is_admin) redirect('/')
 
+  // Pending signup requests count
+  const { count: pendingSignups } = await supabaseAdmin
+    .from('signup_requests')
+    .select('*', { count: 'exact', head: true })
+    .eq('status', 'pending')
+
   // Fetch characters with their cards
   const { data: characters } = await supabaseAdmin
     .from('characters')
@@ -82,6 +88,27 @@ export default async function AdminPage() {
               </div>
             </div>
             <Link href="/admin/proposals" className="bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors">
+              Review
+            </Link>
+          </div>
+
+          {/* Signup requests link */}
+          <div className="glass rounded-xl p-4 flex items-center justify-between mt-4">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🙋</span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <div className="text-white font-bold text-sm">Signup Requests</div>
+                  {(pendingSignups ?? 0) > 0 && (
+                    <span className="bg-amber-500 text-black text-xs font-black px-1.5 py-0.5 rounded-full leading-none">
+                      {pendingSignups}
+                    </span>
+                  )}
+                </div>
+                <div className="text-gray-400 text-xs">Approve or reject new account requests</div>
+              </div>
+            </div>
+            <Link href="/admin/signups" className="bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors">
               Review
             </Link>
           </div>
