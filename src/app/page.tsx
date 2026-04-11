@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
+import PullFeedTicker from '@/components/PullFeedTicker'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { redirect } from 'next/navigation'
@@ -64,6 +65,7 @@ export default async function DashboardPage() {
   return (
     <>
       <Navbar />
+      <PullFeedTicker />
       <main className="pt-14 min-h-screen bg-[#08080f]">
         <div className="max-w-4xl mx-auto px-4 py-12">
 

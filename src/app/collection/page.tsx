@@ -14,7 +14,7 @@ export default async function CollectionPage() {
     supabaseAdmin.from('profiles').select('username, display_name').eq('id', user.id).single(),
     supabaseAdmin
       .from('user_cards')
-      .select('id, card_id, obtained_at, card:cards(id, variant_name, rarity, image_url, character:characters(id, name))')
+      .select('id, card_id, obtained_at, card:cards(id, variant_name, rarity, image_url, created_at, character:characters(id, name))')
       .eq('user_id', user.id)
       .order('obtained_at', { ascending: false }),
     supabaseAdmin.from('profiles').select('username, display_name').neq('id', user.id).order('username'),

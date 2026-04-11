@@ -162,3 +162,10 @@ body {
   50%       { opacity: 1;   transform: scale(1.2); }
 }
 .dot-pulse { animation: dot-pulse 1s ease-in-out infinite; }
+
+/* ── Pull feed ticker scroll ── */
+@keyframes scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.animate-scroll { animation: scroll 60s linear infinite; }

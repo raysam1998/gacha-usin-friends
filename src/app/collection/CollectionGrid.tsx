@@ -3,12 +3,14 @@
 import { useState, useMemo } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { NewBadge } from '@/components/NewBadge'
 
 type CardData = {
   id: string
   variant_name: string
   rarity: string
   image_url: string
+  created_at: string
   character: { id: string; name: string }
 }
 
@@ -43,6 +45,7 @@ function CardTile({ uc, dupeCount, highlight }: {
     }`} style={RARITY_GLOW[uc.card.rarity]}>
       <div className="relative w-full" style={{ aspectRatio: '3/4' }}>
         <Image src={uc.card.image_url} alt={uc.card.variant_name} fill className="object-cover" />
+        <NewBadge createdAt={uc.card.created_at} />
         {dupeCount > 1 && (
           <div className="absolute top-1.5 right-1.5 bg-gray-950/90 border border-white/20 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
             ×{dupeCount}

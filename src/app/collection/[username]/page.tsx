@@ -38,7 +38,7 @@ export default async function UserCollectionPage({
   const fetchCards = (userId: string) =>
     supabaseAdmin
       .from('user_cards')
-      .select('id, card_id, obtained_at, card:cards(id, variant_name, rarity, image_url, character:characters(id, name))')
+      .select('id, card_id, obtained_at, card:cards(id, variant_name, rarity, image_url, created_at, character:characters(id, name))')
       .eq('user_id', userId)
       .order('obtained_at', { ascending: false })
 
