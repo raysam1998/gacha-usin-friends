@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
@@ -67,6 +68,23 @@ export default async function AdminPage() {
 
           {/* Users section */}
           <UsersManager users={users ?? []} />
+
+          {/* Divider */}
+          <div className="border-t border-gray-800 my-10" />
+
+          {/* Proposals link */}
+          <div className="glass rounded-xl p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">💡</span>
+              <div>
+                <div className="text-white font-bold text-sm">Card Proposals</div>
+                <div className="text-gray-400 text-xs">Review community-submitted card ideas</div>
+              </div>
+            </div>
+            <Link href="/admin/proposals" className="bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors">
+              Review
+            </Link>
+          </div>
 
         </div>
       </main>

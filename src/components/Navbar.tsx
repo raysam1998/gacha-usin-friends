@@ -69,8 +69,11 @@ export default async function Navbar() {
           <Link href="/pull" className="text-gray-400 hover:text-violet-400 text-sm transition-colors px-2 py-1 rounded-lg hover:bg-violet-500/10">
             pull
           </Link>
-          <Link href="/collection" className="text-gray-400 hover:text-violet-400 text-sm transition-colors px-2 py-1 rounded-lg hover:bg-violet-500/10">
+          <Link href="/collection" className="text-gray-400 hover:text-violet-400 text-sm transition-colors px-2 py-1 rounded-lg hover:bg-violet-500/10 hidden sm:block">
             collection
+          </Link>
+          <Link href="/proposals" className="text-gray-400 hover:text-violet-400 text-sm transition-colors px-2 py-1 rounded-lg hover:bg-violet-500/10 hidden sm:block">
+            proposals
           </Link>
 
           {/* Admin badge */}
