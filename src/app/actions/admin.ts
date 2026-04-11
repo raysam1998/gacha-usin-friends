@@ -199,3 +199,72 @@ export async function deleteUserAction(
   revalidatePath('/admin')
   return { error: null, success: 'User deleted' }
 }
+
+export async function editUserAction(
+  prevState: AdminState | null,
+  formData: FormData
+): Promise<AdminState> {
+  try {
+    await requireAdmin()
+  } catch {
+    return { error: 'Unauthorized', success: null }
+  }
+
+  const id = formData.get('id') as string
+  const displayName = (formData.get('display_name') as string)?.trim() || null
+  const newUsername = (formData.get('username') as string)?.trim().toLowerCase()
+  const tokens = parseInt(formData.get('tokens') as string, 10)
+  const isAdmin = formData.get('is_admin') === 'true'  // unchecked checkbox won't be in FormData
+  const resetPity = formData.get('reset_pity') === 'true'
+
+  if (!newUsername || newUsername.length < 3) return { error: 'Username too short', success: null }
+  if (isNaN(tokens) || tokens < 0) return { error: 'Invalid token count', success: null }
+
+  // Check username uniqueness (excluding current user)
+  const { data: existing } = await supabaseAdmin
+    .from('profiles')
+    .select('id')
+    .eq('username', newUsername)
+    .neq('id', id)
+    .maybeSingle()
+  if (existing) return { error: 'Username already taken', success: null }
+
+  // Update auth email if username changed
+  const { data: current } = await supabaseAdmin.from('profiles').select('username').eq('id', id).single()
+  if (current?.username !== newUsername) {
+    const { error: authErr } = await supabaseAdmin.auth.admin.updateUserById(id, {
+      email: `${newUsername}@gacha.local`,
+    })
+    if (authErr) return { error: `Auth update failed: ${authErr.message}`, success: null }
+  }
+
+  const updates: Record<string, unknown> = { display_name: displayName, username: newUsername, tokens, is_admin: isAdmin }
+  if (resetPity) updates.pity_counter = 0
+
+  const { error } = await supabaseAdmin.from('profiles').update(updates).eq('id', id)
+  if (error) return { error: error.message, success: null }
+
+  revalidatePath('/admin')
+  return { error: null, success: 'User updated' }
+}
+
+export async function resetUserPasswordAction(
+  prevState: AdminState | null,
+  formData: FormData
+): Promise<AdminState> {
+  try {
+    await requireAdmin()
+  } catch {
+    return { error: 'Unauthorized', success: null }
+  }
+
+  const id = formData.get('id') as string
+  const password = (formData.get('password') as string)?.trim()
+
+  if (!password || password.length < 6) return { error: 'Min 6 characters', success: null }
+
+  const { error } = await supabaseAdmin.auth.admin.updateUserById(id, { password })
+  if (error) return { error: error.message, success: null }
+
+  return { error: null, success: 'Password updated' }
+}
