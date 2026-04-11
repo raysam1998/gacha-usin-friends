@@ -72,9 +72,11 @@ export default function PullFeedTicker() {
             <span className="text-sm">🎴</span>
             <span className="text-gray-300 text-xs font-medium">{pull.username}</span>
             <span className="text-gray-600 text-xs">pulled</span>
-            <span className={`text-xs font-bold ${rarityColor[pull.rarity]}`}>
-              {rarityEmoji[pull.rarity]} {pull.rarity.charAt(0).toUpperCase() + pull.rarity.slice(1)}
-            </span>
+            {pull.rarity && (
+              <span className={`text-xs font-bold ${rarityColor[pull.rarity] || rarityColor['rare']}`}>
+                {rarityEmoji[pull.rarity as any] || '🎴'} {pull.rarity.charAt(0).toUpperCase() + pull.rarity.slice(1)}
+              </span>
+            )}
             <span className="text-gray-400 text-xs">{pull.variant_name} {pull.character_name}</span>
             <span className="text-gray-600 text-xs">— {formatTimeAgo(pull.obtained_at)}</span>
           </div>
@@ -85,9 +87,11 @@ export default function PullFeedTicker() {
             <span className="text-sm">🎴</span>
             <span className="text-gray-300 text-xs font-medium">{pull.username}</span>
             <span className="text-gray-600 text-xs">pulled</span>
-            <span className={`text-xs font-bold ${rarityColor[pull.rarity]}`}>
-              {rarityEmoji[pull.rarity]} {pull.rarity.charAt(0).toUpperCase() + pull.rarity.slice(1)}
-            </span>
+            {pull.rarity && (
+              <span className={`text-xs font-bold ${rarityColor[pull.rarity] || rarityColor['rare']}`}>
+                {rarityEmoji[pull.rarity as any] || '🎴'} {pull.rarity.charAt(0).toUpperCase() + pull.rarity.slice(1)}
+              </span>
+            )}
             <span className="text-gray-400 text-xs">{pull.variant_name} {pull.character_name}</span>
             <span className="text-gray-600 text-xs">— {formatTimeAgo(pull.obtained_at)}</span>
           </div>
