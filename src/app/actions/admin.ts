@@ -137,6 +137,35 @@ export async function deleteCardAction(
   return { error: null, success: 'Deleted' }
 }
 
+export async function editCardAction(
+  prevState: AdminState | null,
+  formData: FormData
+): Promise<AdminState> {
+  try {
+    await requireAdmin()
+  } catch {
+    return { error: 'Unauthorized', success: null }
+  }
+
+  const id = formData.get('id') as string
+  const variantName = (formData.get('variant_name') as string)?.trim()
+  const rarity = formData.get('rarity') as string
+
+  if (!variantName) return { error: 'Variant name required', success: null }
+  if (!rarity || !['common', 'rare', 'epic', 'legendary'].includes(rarity)) {
+    return { error: 'Invalid rarity', success: null }
+  }
+
+  const { error } = await supabaseAdmin.from('cards').update({
+    variant_name: variantName,
+    rarity,
+  }).eq('id', id)
+
+  if (error) return { error: error.message, success: null }
+  revalidatePath('/admin')
+  return { error: null, success: 'Card updated' }
+}
+
 // ── Users ─────────────────────────────────────────────────────
 function generatePassword(length = 12): string {
   const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$'

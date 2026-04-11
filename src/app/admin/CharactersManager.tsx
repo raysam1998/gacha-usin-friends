@@ -7,6 +7,7 @@ import {
   createCardAction,
   deleteCharacterAction,
   deleteCardAction,
+  editCardAction,
 } from '@/app/actions/admin'
 import type { Character, Card } from '@/types/database'
 
@@ -168,10 +169,58 @@ function DeleteCardButton({ id }: { id: string }) {
   )
 }
 
+// ── Edit card panel ──────────────────────────────────────────
+function EditCardPanel({ card, onClose }: { card: Card; onClose: () => void }) {
+  const [state, action, pending] = useActionState(editCardAction, null)
+
+  return (
+    <form action={action} className="bg-gray-900/60 border border-gray-700/50 rounded-xl p-3 space-y-2 mt-2">
+      <input type="hidden" name="id" value={card.id} />
+      <div className="flex items-center justify-between mb-1">
+        <h5 className="text-xs font-bold text-gray-300">Edit card</h5>
+        <button type="button" onClick={onClose} className="text-gray-500 hover:text-gray-300 text-lg leading-none">×</button>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="block text-gray-500 text-xs mb-1">Variant name</label>
+          <input
+            name="variant_name"
+            defaultValue={card.variant_name}
+            required
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2.5 py-1.5 text-white text-sm outline-none focus:border-violet-500"
+          />
+        </div>
+        <div>
+          <label className="block text-gray-500 text-xs mb-1">Rarity</label>
+          <select
+            name="rarity"
+            defaultValue={card.rarity}
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2.5 py-1.5 text-white text-sm outline-none focus:border-violet-500"
+          >
+            {RARITIES.map(r => (
+              <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+      {state?.error && <p className="text-red-400 text-xs">{state.error}</p>}
+      {state?.success && <p className="text-green-400 text-xs">{state.success}</p>}
+      <button
+        type="submit"
+        disabled={pending}
+        className="bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors w-full"
+      >
+        {pending ? 'Saving…' : 'Save'}
+      </button>
+    </form>
+  )
+}
+
 // ── Main Manager ──────────────────────────────────────────────
 export default function CharactersManager({ characters }: { characters: CharacterWithCards[] }) {
   const [showCreateChar, setShowCreateChar] = useState(false)
   const [activeCardForm, setActiveCardForm] = useState<string | null>(null)
+  const [editingCardId, setEditingCardId] = useState<string | null>(null)
 
   return (
     <section>
@@ -225,8 +274,14 @@ export default function CharactersManager({ characters }: { characters: Characte
               )}
               <div className="flex flex-wrap gap-3">
                 {char.cards.map((card) => (
-                  <div key={card.id} className="group relative w-20 flex flex-col items-center gap-1">
-                    <div className={`relative w-20 h-28 rounded-lg overflow-hidden border-2 ${card.rarity === 'legendary' ? 'rarity-legendary' : card.rarity === 'epic' ? 'rarity-epic' : card.rarity === 'rare' ? 'rarity-rare' : 'rarity-common'}`}>
+                  <div key={card.id} className="flex flex-col gap-1">
+                    <div
+                      className="group relative w-20 h-28 rounded-lg overflow-hidden border-2 cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => setEditingCardId(editingCardId === card.id ? null : card.id)}
+                      style={{
+                        borderColor: card.rarity === 'legendary' ? '#fbbf24' : card.rarity === 'epic' ? '#c084fc' : card.rarity === 'rare' ? '#60a5fa' : '#4b5563'
+                      }}
+                    >
                       <Image src={card.image_url} alt={card.variant_name} fill className="object-cover" />
                       <div className="absolute top-1 right-1">
                         <DeleteCardButton id={card.id} />
@@ -236,6 +291,9 @@ export default function CharactersManager({ characters }: { characters: Characte
                     <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${rarityColors[card.rarity]}`}>
                       {card.rarity}
                     </span>
+                    {editingCardId === card.id && (
+                      <EditCardPanel card={card} onClose={() => setEditingCardId(null)} />
+                    )}
                   </div>
                 ))}
               </div>
