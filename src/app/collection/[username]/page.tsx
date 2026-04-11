@@ -1,4 +1,5 @@
 import { redirect, notFound } from 'next/navigation'
+import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
@@ -65,8 +66,11 @@ export default async function UserCollectionPage({
           </div>
 
           {targetCards.length === 0 ? (
-            <div className="text-center py-20 text-gray-600 text-sm">
-              {targetName} hasn&apos;t pulled any cards yet.
+            <div className="text-center py-20 space-y-3">
+              <p className="text-gray-600 text-sm">{`${targetName} hasn't pulled any cards yet.`}</p>
+              <Link href="/collection" className="inline-block text-gray-500 hover:text-gray-400 text-xs transition-colors">
+                ← back to collections
+              </Link>
             </div>
           ) : (
             <CollectionGrid
