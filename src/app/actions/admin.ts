@@ -292,11 +292,15 @@ export async function updateGachaConfigAction(
   const bonusMinutes = parseFloat(formData.get('bonus_token_interval_minutes') as string)
   const bonusHours = bonusMinutes / 60
   const autoApproveVotes = parseInt(formData.get('auto_approve_votes') as string, 10)
+  const userNewsEnabled = formData.get('user_news_enabled') === 'true'
+  const userNewsCooldown = parseInt(formData.get('user_news_cooldown_minutes') as string, 10)
+  const userNewsAutoActive = formData.get('user_news_auto_active') === 'true'
 
   if (isNaN(dailyTokens) || dailyTokens < 0) return { error: 'Invalid daily tokens', success: null }
   if (isNaN(bonusAmount) || bonusAmount < 0) return { error: 'Invalid bonus amount', success: null }
   if (isNaN(bonusMinutes) || bonusMinutes < 0) return { error: 'Invalid bonus interval', success: null }
   if (isNaN(autoApproveVotes) || autoApproveVotes < 1) return { error: 'Invalid auto-approve threshold', success: null }
+  if (isNaN(userNewsCooldown) || userNewsCooldown < 1) return { error: 'Cooldown must be at least 1 minute', success: null }
 
   // gacha_config is a single-row table — update the first row
   const { data: cfg } = await supabaseAdmin.from('gacha_config').select('id').single()
@@ -307,6 +311,9 @@ export async function updateGachaConfigAction(
     bonus_token_amount: bonusAmount,
     bonus_token_interval_hours: bonusHours,
     auto_approve_votes: autoApproveVotes,
+    user_news_enabled: userNewsEnabled,
+    user_news_cooldown_minutes: userNewsCooldown,
+    user_news_auto_active: userNewsAutoActive,
   }).eq('id', cfg.id)
 
   if (error) return { error: error.message, success: null }

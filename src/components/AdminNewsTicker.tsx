@@ -8,6 +8,8 @@ interface NewsMessage {
   message: string;
   active: boolean;
   created_at: string;
+  submitted_by: string | null;
+  profiles: { username: string } | null;
 }
 
 export default function AdminNewsTicker() {
@@ -33,9 +35,9 @@ export default function AdminNewsTicker() {
   async function fetchMessages() {
     const { data } = await supabase
       .from('news_messages')
-      .select('*')
+      .select('*, profiles(username)')
       .order('created_at', { ascending: false });
-    if (data) setMessages(data);
+    if (data) setMessages(data as NewsMessage[]);
   }
 
   async function fetchConfig() {
@@ -174,6 +176,9 @@ export default function AdminNewsTicker() {
           <div key={msg.id} className={`admin-news-item ${!msg.active ? 'inactive' : ''}`}>
             <div className="admin-news-item-text">
               <span className="admin-news-item-diamond">&#x25C6;</span>
+              {msg.submitted_by && (
+                <span className="user-badge">👤 {msg.profiles?.username ?? '?'}</span>
+              )}
               {msg.message}
             </div>
             <div className="admin-news-item-actions">
@@ -230,6 +235,7 @@ export default function AdminNewsTicker() {
         .admin-news-item.inactive { opacity: 0.35; }
         .admin-news-item-text { flex: 1; font-size: 13px; color: rgba(255,255,255,0.75); display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .admin-news-item-diamond { color: #C1272D; font-size: 8px; flex-shrink: 0; }
+        .user-badge { font-size: 10px; color: rgba(150,120,255,0.8); background: rgba(150,120,255,0.1); border: 1px solid rgba(150,120,255,0.2); border-radius: 4px; padding: 1px 5px; flex-shrink: 0; white-space: nowrap; }
         .admin-news-item-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
         .admin-news-toggle { padding: 4px 12px; border-radius: 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; cursor: pointer; border: 1px solid; transition: all 0.2s; }
         .admin-news-toggle.on { background: rgba(45,158,45,0.15); border-color: rgba(45,158,45,0.3); color: #2d9e2d; }

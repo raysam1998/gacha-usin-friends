@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 import PullFeedTicker from '@/components/PullFeedTicker'
+import UserNewsSubmit from '@/components/UserNewsSubmit'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { redirect } from 'next/navigation'
@@ -10,17 +11,27 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabaseAdmin
-    .from('profiles')
-    .select('username, display_name, is_admin, tokens')
-    .eq('id', user.id)
-    .single()
+  const [profileRes, cardCountRes, newsCfgRes] = await Promise.all([
+    supabaseAdmin
+      .from('profiles')
+      .select('username, display_name, is_admin, tokens, last_news_submission_at')
+      .eq('id', user.id)
+      .single(),
+    supabaseAdmin
+      .from('user_cards')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id),
+    supabaseAdmin
+      .from('gacha_config')
+      .select('user_news_enabled, user_news_cooldown_minutes, user_news_auto_active')
+      .single(),
+  ])
 
-  const { count: cardCount } = await supabaseAdmin
-    .from('user_cards')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', user.id)
+  const profile = profileRes.data
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const newsCfg = newsCfgRes.data as any
 
+  const { count: cardCount } = cardCountRes
   const name = profile?.display_name ?? profile?.username ?? 'homie'
 
   const actions = [
@@ -119,6 +130,18 @@ export default async function DashboardPage() {
               >
                 Open
               </Link>
+            </div>
+          )}
+
+          {/* User news submission widget — only shown when admin enables it */}
+          {newsCfg?.user_news_enabled && (
+            <div className="mt-6">
+              <UserNewsSubmit
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                lastSubmitAt={(profile as any)?.last_news_submission_at ?? null}
+                cooldownMinutes={newsCfg.user_news_cooldown_minutes ?? 5}
+                autoActive={newsCfg.user_news_auto_active ?? false}
+              />
             </div>
           )}
         </div>

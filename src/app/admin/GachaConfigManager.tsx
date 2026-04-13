@@ -8,6 +8,9 @@ type Config = {
   bonus_token_amount: number
   bonus_token_interval_hours: number
   auto_approve_votes: number
+  user_news_enabled: boolean
+  user_news_cooldown_minutes: number
+  user_news_auto_active: boolean
 }
 
 export default function GachaConfigManager({ config }: { config: Config }) {
@@ -88,6 +91,53 @@ export default function GachaConfigManager({ config }: { config: Config }) {
           {(config.bonus_token_amount === 0 || config.bonus_token_interval_hours === 0) && (
             <div className="text-gray-600 text-xs">Disabled (amount or interval is 0)</div>
           )}
+        </div>
+
+        {/* User news submissions */}
+        <div className="border border-gray-800 rounded-lg p-4 space-y-3">
+          <div className="text-gray-300 text-xs font-bold uppercase tracking-wider">User News Submissions</div>
+          <div className="text-gray-500 text-xs">
+            Let users submit messages to the ticker. Off by default.
+          </div>
+          <div className="flex items-center gap-6 flex-wrap">
+            {/* Enable toggle */}
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                name="user_news_enabled"
+                value="true"
+                defaultChecked={config.user_news_enabled}
+                className="w-4 h-4 accent-violet-500"
+              />
+              <span className="text-gray-300 text-xs">Enable submissions</span>
+            </label>
+            {/* Auto-active toggle */}
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                name="user_news_auto_active"
+                value="true"
+                defaultChecked={config.user_news_auto_active}
+                className="w-4 h-4 accent-violet-500"
+              />
+              <span className="text-gray-300 text-xs">Auto-approve (live immediately)</span>
+            </label>
+          </div>
+          <div className="flex items-center gap-3">
+            <label className="text-gray-400 text-xs whitespace-nowrap">Cooldown (minutes)</label>
+            <input
+              name="user_news_cooldown_minutes"
+              type="number"
+              min="1"
+              defaultValue={config.user_news_cooldown_minutes}
+              className="w-24 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-violet-500"
+            />
+          </div>
+          <div className="text-gray-600 text-xs">
+            {config.user_news_enabled
+              ? `Active · ${config.user_news_cooldown_minutes}min cooldown · ${config.user_news_auto_active ? 'auto-approved' : 'pending admin review'}`
+              : 'Disabled — submission widget hidden from users'}
+          </div>
         </div>
 
         {state?.error && (
