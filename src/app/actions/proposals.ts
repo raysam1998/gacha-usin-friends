@@ -91,28 +91,45 @@ export async function voteAction(
 
   if (error) return { error: error.message, success: null }
 
+  // Auto-approve if approve vote count reaches threshold
+  if (vote === 'approve') {
+    const { data: config } = await supabaseAdmin
+      .from('gacha_config')
+      .select('auto_approve_votes')
+      .single()
+
+    const threshold = config?.auto_approve_votes ?? 4
+
+    const { count: approveCount } = await supabaseAdmin
+      .from('proposal_votes')
+      .select('*', { count: 'exact', head: true })
+      .eq('proposal_id', proposalId)
+      .eq('vote', 'approve')
+
+    if ((approveCount ?? 0) >= threshold) {
+      // Check proposal is still in voting (not already decided)
+      const { data: proposal } = await supabaseAdmin
+        .from('card_proposals')
+        .select('status')
+        .eq('id', proposalId)
+        .single()
+
+      if (proposal?.status === 'voting') {
+        await doApproveProposal(proposalId)
+        revalidatePath('/proposals')
+        revalidatePath('/admin/proposals')
+        return { error: null, success: `Auto-approved! Reached ${threshold} yay votes.` }
+      }
+    }
+  }
+
   revalidatePath('/proposals')
   revalidatePath('/admin/proposals')
   return { error: null, success: 'Vote saved!' }
 }
 
-// ── Admin: approve ────────────────────────────────────────────
-export async function approveProposalAction(
-  prevState: ProposalState,
-  formData: FormData
-): Promise<ProposalState> {
-  let user
-  try {
-    user = await getCurrentUser()
-    await requireAdmin(user.id)
-  } catch (e: unknown) {
-    return { error: e instanceof Error ? e.message : 'Unauthorized', success: null }
-  }
-
-  const proposalId = formData.get('proposal_id') as string
-  const rarityOverride = formData.get('rarity') as string
-
-  // Fetch proposal
+// ── Internal: do the actual approval (shared by manual + auto) ─
+async function doApproveProposal(proposalId: string, rarityOverride?: string): Promise<ProposalState> {
   const { data: proposal } = await supabaseAdmin
     .from('card_proposals')
     .select('*, proposal_votes(vote, voted_rarity)')
@@ -120,25 +137,23 @@ export async function approveProposalAction(
     .single()
 
   if (!proposal) return { error: 'Proposal not found', success: null }
+  if (proposal.status !== 'voting') return { error: null, success: 'Already decided' }
 
-  // Determine rarity: override → most-approve-voted → proposed_rarity
-  let rarity = rarityOverride
+  // Determine rarity
+  let rarity = rarityOverride ?? ''
   if (!rarity) {
     type VoteRow = { vote: string; voted_rarity: string }
-    const allVotes = (proposal.proposal_votes ?? []) as VoteRow[]
-    const approveVotes = allVotes.filter(v => v.vote === 'approve')
+    const approveVotes = ((proposal.proposal_votes ?? []) as VoteRow[]).filter(v => v.vote === 'approve')
     if (approveVotes.length > 0) {
       const counts: Record<string, number> = {}
-      for (const v of approveVotes) {
-        counts[v.voted_rarity] = (counts[v.voted_rarity] || 0) + 1
-      }
+      for (const v of approveVotes) counts[v.voted_rarity] = (counts[v.voted_rarity] || 0) + 1
       rarity = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0]
     } else {
       rarity = proposal.proposed_rarity
     }
   }
 
-  // If new character, create it first
+  // Create character if new
   let characterId = proposal.character_id
   if (!characterId && proposal.new_character_name) {
     const { data: newChar, error: charError } = await supabaseAdmin
@@ -146,33 +161,43 @@ export async function approveProposalAction(
       .insert({ name: proposal.new_character_name })
       .select('id')
       .single()
-
     if (charError) return { error: `Failed to create character: ${charError.message}`, success: null }
     characterId = newChar.id
   }
 
   if (!characterId) return { error: 'No character to attach card to', success: null }
 
-  // Create the card
   const { error: cardError } = await supabaseAdmin.from('cards').insert({
     character_id: characterId,
     variant_name: proposal.variant_name,
     rarity,
     image_url: proposal.image_url,
   })
-
   if (cardError) return { error: cardError.message, success: null }
 
-  // Mark proposal approved
-  await supabaseAdmin
-    .from('card_proposals')
-    .update({ status: 'approved' })
-    .eq('id', proposalId)
+  await supabaseAdmin.from('card_proposals').update({ status: 'approved' }).eq('id', proposalId)
 
   revalidatePath('/proposals')
   revalidatePath('/admin/proposals')
   revalidatePath('/admin')
   return { error: null, success: 'Approved and card created!' }
+}
+
+// ── Admin: approve ────────────────────────────────────────────
+export async function approveProposalAction(
+  prevState: ProposalState,
+  formData: FormData
+): Promise<ProposalState> {
+  try {
+    const user = await getCurrentUser()
+    await requireAdmin(user.id)
+  } catch (e: unknown) {
+    return { error: e instanceof Error ? e.message : 'Unauthorized', success: null }
+  }
+
+  const proposalId = formData.get('proposal_id') as string
+  const rarityOverride = (formData.get('rarity') as string) || undefined
+  return doApproveProposal(proposalId, rarityOverride)
 }
 
 // ── Admin: reject ─────────────────────────────────────────────

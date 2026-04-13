@@ -65,8 +65,8 @@ export default async function DashboardPage() {
   return (
     <>
       <Navbar />
-      <PullFeedTicker />
       <main className="pt-14 min-h-screen bg-[#08080f]">
+        <PullFeedTicker />
         <div className="max-w-4xl mx-auto px-4 py-12">
 
           {/* Hero */}

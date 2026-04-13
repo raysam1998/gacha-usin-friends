@@ -277,6 +277,44 @@ export async function editUserAction(
   return { error: null, success: 'User updated' }
 }
 
+export async function updateGachaConfigAction(
+  prevState: AdminState | null,
+  formData: FormData
+): Promise<AdminState> {
+  try {
+    await requireAdmin()
+  } catch {
+    return { error: 'Unauthorized', success: null }
+  }
+
+  const dailyTokens = parseInt(formData.get('daily_tokens') as string, 10)
+  const bonusAmount = parseInt(formData.get('bonus_token_amount') as string, 10)
+  const bonusMinutes = parseFloat(formData.get('bonus_token_interval_minutes') as string)
+  const bonusHours = bonusMinutes / 60
+  const autoApproveVotes = parseInt(formData.get('auto_approve_votes') as string, 10)
+
+  if (isNaN(dailyTokens) || dailyTokens < 0) return { error: 'Invalid daily tokens', success: null }
+  if (isNaN(bonusAmount) || bonusAmount < 0) return { error: 'Invalid bonus amount', success: null }
+  if (isNaN(bonusMinutes) || bonusMinutes < 0) return { error: 'Invalid bonus interval', success: null }
+  if (isNaN(autoApproveVotes) || autoApproveVotes < 1) return { error: 'Invalid auto-approve threshold', success: null }
+
+  // gacha_config is a single-row table — update the first row
+  const { data: cfg } = await supabaseAdmin.from('gacha_config').select('id').single()
+  if (!cfg) return { error: 'Config not found', success: null }
+
+  const { error } = await supabaseAdmin.from('gacha_config').update({
+    daily_tokens: dailyTokens,
+    bonus_token_amount: bonusAmount,
+    bonus_token_interval_hours: bonusHours,
+    auto_approve_votes: autoApproveVotes,
+  }).eq('id', cfg.id)
+
+  if (error) return { error: error.message, success: null }
+
+  revalidatePath('/admin')
+  return { error: null, success: 'Config updated!' }
+}
+
 export async function resetUserPasswordAction(
   prevState: AdminState | null,
   formData: FormData

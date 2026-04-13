@@ -5,6 +5,8 @@ import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import CharactersManager from './CharactersManager'
 import UsersManager from './UsersManager'
+import GachaConfigManager from './GachaConfigManager'
+import AdminNewsTicker from '@/components/AdminNewsTicker'
 
 export default async function AdminPage() {
   // Auth + admin guard
@@ -37,6 +39,12 @@ export default async function AdminPage() {
     .from('profiles')
     .select('*')
     .order('created_at', { ascending: true })
+
+  // Fetch gacha config
+  const { data: gachaConfig } = await supabaseAdmin
+    .from('gacha_config')
+    .select('daily_tokens, bonus_token_amount, bonus_token_interval_hours, auto_approve_votes')
+    .single()
 
   const charactersWithCards = (characters ?? []).map((c) => ({
     ...c,
@@ -91,6 +99,21 @@ export default async function AdminPage() {
               Review
             </Link>
           </div>
+
+          {/* News ticker manager */}
+          <AdminNewsTicker />
+
+          <div className="border-t border-gray-800 my-4" />
+
+          {/* Gacha config */}
+          <GachaConfigManager config={{
+            daily_tokens: gachaConfig?.daily_tokens ?? 10,
+            bonus_token_amount: gachaConfig?.bonus_token_amount ?? 0,
+            bonus_token_interval_hours: Number(gachaConfig?.bonus_token_interval_hours ?? 0),
+            auto_approve_votes: gachaConfig?.auto_approve_votes ?? 4,
+          }} />
+
+          <div className="border-t border-gray-800 my-4" />
 
           {/* Signup requests link */}
           <div className="glass rounded-xl p-4 flex items-center justify-between mt-4">

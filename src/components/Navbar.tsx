@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import LogoutButton from './LogoutButton'
+import TokenTimer from './TokenTimer'
 
 export default async function Navbar() {
   const supabase = await createServerSupabaseClient()
@@ -9,35 +10,60 @@ export default async function Navbar() {
 
   if (!user) return null
 
-  // Check + run daily token refresh
-  const { data: profile } = await supabaseAdmin
-    .from('profiles')
-    .select('username, display_name, is_admin, tokens, last_token_refresh')
-    .eq('id', user.id)
-    .single()
+  const [profileRes, configRes] = await Promise.all([
+    supabaseAdmin
+      .from('profiles')
+      .select('username, display_name, is_admin, tokens, last_token_refresh, last_bonus_token_at')
+      .eq('id', user.id)
+      .single(),
+    supabaseAdmin
+      .from('gacha_config')
+      .select('daily_tokens, bonus_token_amount, bonus_token_interval_hours, auto_approve_votes')
+      .single(),
+  ])
+
+  const profile = profileRes.data
+  const config = configRes.data
 
   if (profile) {
-    const lastRefresh = new Date(profile.last_token_refresh)
+    const now = new Date()
+    const updates: Record<string, unknown> = {}
+    let newTokens = profile.tokens
+
+    // Daily reset
     const startOfToday = new Date()
     startOfToday.setHours(0, 0, 0, 0)
+    if (new Date(profile.last_token_refresh) < startOfToday) {
+      newTokens = config?.daily_tokens ?? 10
+      updates.last_token_refresh = now.toISOString()
+    }
 
-    if (lastRefresh < startOfToday) {
-      const { data: config } = await supabaseAdmin
-        .from('gacha_config')
-        .select('daily_tokens')
-        .single()
+    // Bonus token drip
+    const bonusAmount = config?.bonus_token_amount ?? 0
+    const bonusIntervalHours = Number(config?.bonus_token_interval_hours ?? 0)
+    if (bonusAmount > 0 && bonusIntervalHours > 0) {
+      const intervalMs = bonusIntervalHours * 60 * 60 * 1000
+      const lastBonus = profile.last_bonus_token_at
+        ? new Date(profile.last_bonus_token_at)
+        : new Date(0)
+      if (now.getTime() - lastBonus.getTime() >= intervalMs) {
+        newTokens += bonusAmount
+        updates.last_bonus_token_at = now.toISOString()
+      }
+    }
 
-      await supabaseAdmin
-        .from('profiles')
-        .update({
-          tokens: config?.daily_tokens ?? 10,
-          last_token_refresh: new Date().toISOString(),
-        })
-        .eq('id', user.id)
-
-      if (profile) profile.tokens = config?.daily_tokens ?? 10
+    if (Object.keys(updates).length > 0) {
+      updates.tokens = newTokens
+      await supabaseAdmin.from('profiles').update(updates).eq('id', user.id)
+      profile.tokens = newTokens
+      if (updates.last_bonus_token_at) {
+        profile.last_bonus_token_at = updates.last_bonus_token_at as string
+      }
     }
   }
+
+  const bonusAmount = Number(config?.bonus_token_amount ?? 0)
+  const bonusIntervalHours = Number(config?.bonus_token_interval_hours ?? 0)
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-[#08080f]/80 backdrop-blur-md">
@@ -51,7 +77,7 @@ export default async function Navbar() {
         </Link>
 
         {/* Right side */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {/* Token count */}
           <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/20 rounded-full px-3 py-1">
             <span className="text-sm">🪙</span>
@@ -59,6 +85,14 @@ export default async function Navbar() {
               {profile?.tokens ?? 0}
             </span>
           </div>
+
+          {/* Countdown timer — client component */}
+          <TokenTimer
+            lastBonusAt={profile?.last_bonus_token_at ?? null}
+            intervalHours={bonusIntervalHours}
+            bonusAmount={bonusAmount}
+            dailyTokens={Number(config?.daily_tokens ?? 10)}
+          />
 
           {/* Username */}
           <span className="text-gray-300 text-sm font-medium hidden sm:block">
