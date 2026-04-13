@@ -3,7 +3,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { createClient } from '@/lib/supabase';
 
-// Fallback messages when no admin messages exist
 const FALLBACK_NEWS = [
   'BREAKING: Kevin pulled an Epic for the 4th time today. Experts baffled.',
   'URGENT: Someone actually used all their daily tokens before noon. Investigation underway.',
@@ -19,65 +18,135 @@ const FALLBACK_NEWS = [
   'A moment of silence for the tokens wasted on Common pulls today.',
 ];
 
-interface NewsMessage {
-  id: string;
-  message: string;
-  created_at: string;
-}
+interface NewsMsg { id: string; message: string; created_at: string; }
 
 export default function NewsTicker() {
-  const [messages, setMessages] = useState<string[]>(FALLBACK_NEWS);
+  const [messages, setMessages]   = useState<string[]>(FALLBACK_NEWS);
+  const [spacing, setSpacing]     = useState(32);   // px padding per side on each item
+  const [copies, setCopies]       = useState(2);    // auto-scaled to fill viewport
   const [currentTime, setCurrentTime] = useState('');
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [isPaused, setIsPaused] = useState(false);
 
+  // RAF refs — mutable, no re-render needed
+  const innerRef   = useRef<HTMLDivElement>(null);
+  const posRef     = useRef(0);
+  const rafRef     = useRef<number | undefined>(undefined);
+  const pausedRef  = useRef(false);
+  const speedRef   = useRef(80);  // px/sec — updated from DB without restarting animation
+  const setWidRef  = useRef(0);   // width of ONE set of messages
+
+  // ── Fetch messages + config, subscribe to changes ───────────────────────
   useEffect(() => {
     const supabase = createClient();
 
-    async function fetchNews() {
-      const { data } = await supabase
-        .from('news_messages')
-        .select('id, message, created_at')
-        .eq('active', true)
-        .order('created_at', { ascending: false })
-        .limit(20);
+    async function fetchData() {
+      const [newsRes, cfgRes] = await Promise.all([
+        supabase
+          .from('news_messages')
+          .select('id, message, created_at')
+          .eq('active', true)
+          .order('created_at', { ascending: false })
+          .limit(20),
+        supabase
+          .from('gacha_config')
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .select('ticker_speed, ticker_spacing' as any)
+          .single(),
+      ]);
 
-      if (data && data.length > 0) {
-        setMessages(data.map((n: NewsMessage) => n.message));
+      if (newsRes.data && newsRes.data.length > 0) {
+        setMessages(newsRes.data.map((n: NewsMsg) => n.message));
+      }
+      if (cfgRes.data) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const cfg = cfgRes.data as any;
+        speedRef.current = cfg.ticker_speed  ?? 80;
+        setSpacing(cfg.ticker_spacing ?? 32);
       }
     }
 
-    fetchNews();
+    fetchData();
 
     const channel = supabase
       .channel('news-ticker')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'news_messages' }, () => {
-        fetchNews();
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'news_messages' }, fetchData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'gacha_config' },  fetchData)
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
   }, []);
 
+  // ── Auto-scale copies until one set fills the visible area ───────────────
+  // Runs after render when messages or copies change.
   useEffect(() => {
-    function tick() {
-      const now = new Date();
-      const h = String(now.getHours()).padStart(2, '0');
-      const m = String(now.getMinutes()).padStart(2, '0');
-      const s = String(now.getSeconds()).padStart(2, '0');
-      setCurrentTime(`${h}:${m}:${s}`);
+    const inner = innerRef.current;
+    if (!inner || copies >= 8) return;
+
+    const oneSetWidth   = inner.scrollWidth / copies;
+    const visibleWidth  = (inner.parentElement as HTMLElement | null)?.clientWidth ?? 0;
+
+    if (oneSetWidth < visibleWidth) {
+      setCopies(c => c * 2);
     }
+  }, [messages, copies, spacing]);
+
+  // ── RAF animation — restart when messages/copies/spacing change ──────────
+  useEffect(() => {
+    const inner = innerRef.current;
+    if (!inner) return;
+
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    posRef.current = 0;
+
+    // Defer one frame so the DOM reflects the latest copies/spacing render
+    const setupId = requestAnimationFrame(() => {
+      setWidRef.current = inner.scrollWidth / copies;  // width of ONE message set
+
+      let lastTime: number | null = null;
+
+      const tick = (now: number) => {
+        if (lastTime !== null && !pausedRef.current && setWidRef.current > 0) {
+          const delta = now - lastTime;
+          posRef.current += (speedRef.current * delta) / 1000;
+          if (posRef.current >= setWidRef.current) {
+            posRef.current -= setWidRef.current;   // seamless reset
+          }
+          inner.style.transform = `translateX(-${posRef.current}px)`;
+        }
+        lastTime = now;
+        rafRef.current = requestAnimationFrame(tick);
+      };
+
+      rafRef.current = requestAnimationFrame(tick);
+    });
+
+    return () => {
+      cancelAnimationFrame(setupId);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [messages, copies, spacing]);
+
+  // ── Clock ────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const tick = () => {
+      const now = new Date();
+      setCurrentTime(
+        `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`
+      );
+    };
     tick();
-    const interval = setInterval(tick, 1000);
-    return () => clearInterval(interval);
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
   }, []);
 
-  const duplicatedMessages = [...messages, ...messages];
+  // Build the looped message array
+  const loopMessages = Array.from({ length: copies }).flatMap(() => messages);
 
   return (
     <div className="ticker-container">
       <div className="chyron">
         <div className="chyron-top">
+
+          {/* Logo */}
           <div className="logo-section">
             <svg width="36" height="36" viewBox="0 0 100 100">
               <circle cx="50" cy="50" r="46" fill="none" stroke="#2d6a2e" strokeWidth="3.5" />
@@ -88,6 +157,7 @@ export default function NewsTicker() {
             </svg>
           </div>
 
+          {/* Badge */}
           <div className="badge-section">
             <span className="badge-dot" />
             <span className="badge-text">الأخبار</span>
@@ -95,18 +165,15 @@ export default function NewsTicker() {
             <span className="badge-sub">LIVE</span>
           </div>
 
+          {/* Scrolling text */}
           <div
             className="scroll-section"
-            onMouseEnter={() => setIsPaused(true)}
-            onMouseLeave={() => setIsPaused(false)}
+            onMouseEnter={() => { pausedRef.current = true; }}
+            onMouseLeave={() => { pausedRef.current = false; }}
           >
-            <div
-              ref={scrollRef}
-              className="scroll-inner"
-              style={{ animationPlayState: isPaused ? 'paused' : 'running' }}
-            >
-              {duplicatedMessages.map((msg, i) => (
-                <span key={i} className="news-item">
+            <div ref={innerRef} className="scroll-inner">
+              {loopMessages.map((msg, i) => (
+                <span key={i} className="news-item" style={{ padding: `0 ${spacing}px` }}>
                   <span className="news-diamond">&#x25C6;</span>
                   {msg}
                 </span>
@@ -115,6 +182,7 @@ export default function NewsTicker() {
           </div>
         </div>
 
+        {/* Bottom bar */}
         <div className="chyron-bottom">
           <div className="bottom-left">
             <span className="bottom-title">الأخبار</span>
@@ -126,19 +194,14 @@ export default function NewsTicker() {
       </div>
 
       <style jsx>{`
-        @keyframes scroll {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
         @keyframes pulse {
           0%, 100% { opacity: 1; }
-          50% { opacity: 0.4; }
+          50%       { opacity: 0.4; }
         }
         .ticker-container { width: 100%; padding: 0; margin: 8px 0; }
         .chyron { border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,0.06); box-shadow: 0 2px 12px rgba(0,0,0,0.3); }
         .chyron-top { display: flex; align-items: stretch; height: 48px; }
         .logo-section { background: #0a0a12; display: flex; align-items: center; justify-content: center; padding: 0 8px; flex-shrink: 0; width: 54px; border-right: 1px solid rgba(255,255,255,0.06); }
-        .logo-img { object-fit: contain; filter: brightness(1.1); }
         .badge-section { background: #C1272D; color: #fff; display: flex; align-items: center; gap: 8px; padding: 0 16px 0 14px; flex-shrink: 0; position: relative; z-index: 2; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         .badge-section::after { content: ''; position: absolute; right: -16px; top: 0; width: 0; height: 0; border-top: 24px solid transparent; border-bottom: 24px solid transparent; border-left: 16px solid #C1272D; }
         .badge-dot { width: 8px; height: 8px; border-radius: 50%; background: #ff4444; animation: pulse 1.2s ease-in-out infinite; box-shadow: 0 0 6px rgba(255,68,68,0.7); flex-shrink: 0; }
@@ -146,8 +209,8 @@ export default function NewsTicker() {
         .badge-divider { opacity: 0.5; font-size: 14px; }
         .badge-sub { font-size: 10px; font-weight: 600; letter-spacing: 2px; opacity: 0.9; }
         .scroll-section { flex: 1; overflow: hidden; display: flex; align-items: center; background: #0f0f1a; padding-left: 24px; }
-        .scroll-inner { display: flex; white-space: nowrap; animation: scroll 55s linear infinite; will-change: transform; }
-        .news-item { display: inline-flex; align-items: center; gap: 8px; padding: 0 32px; font-size: 13px; color: rgba(255,255,255,0.85); font-weight: 400; flex-shrink: 0; letter-spacing: 0.2px; }
+        .scroll-inner { display: flex; white-space: nowrap; will-change: transform; }
+        .news-item { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: rgba(255,255,255,0.85); font-weight: 400; flex-shrink: 0; letter-spacing: 0.2px; }
         .news-diamond { color: #C1272D; font-size: 9px; flex-shrink: 0; }
         .chyron-bottom { display: flex; align-items: center; justify-content: space-between; height: 28px; padding: 0 14px; background: #080810; color: rgba(255,255,255,0.5); font-size: 11px; border-top: 1px solid rgba(255,255,255,0.04); }
         .bottom-left { display: flex; align-items: center; gap: 10px; }
@@ -158,11 +221,10 @@ export default function NewsTicker() {
         @media (max-width: 640px) {
           .chyron-top { height: 42px; }
           .logo-section { width: 44px; padding: 0 4px; }
-          .logo-img { width: 30px !important; height: 30px !important; }
           .badge-text { font-size: 14px; }
           .badge-sub { display: none; }
           .badge-divider { display: none; }
-          .news-item { font-size: 12px; padding: 0 24px; }
+          .news-item { font-size: 12px; }
           .badge-section::after { border-top-width: 21px; border-bottom-width: 21px; }
         }
       `}</style>
