@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { pullCardAction, type PullResult } from '@/app/actions/gacha'
+import { pullCardAction, adminForcePullAction, type PullResult } from '@/app/actions/gacha'
 import ChipiCatOverlay from '@/components/ChipiCatOverlay'
 
 // ── Config ────────────────────────────────────────────────────
@@ -39,10 +39,14 @@ const RARITY_LABEL: Record<string, string> = {
 
 const delay = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
 
+type AdminCard = { id: string; variant_name: string; rarity: string; character: { name: string } }
+const RARITY_ORDER = ['legendary', 'epic', 'rare', 'common']
+
 // ── Particles ─────────────────────────────────────────────────
-function ParticleBurst({ rarity }: { rarity: string }) {
+function ParticleBurst({ rarity, multiplier = 1 }: { rarity: string; multiplier?: number }) {
   const cfg = RARITY_PARTICLES[rarity] ?? RARITY_PARTICLES.common
-  const particles = Array.from({ length: cfg.count }, (_, i) => {
+  const count = Math.max(0, Math.round(cfg.count * multiplier))
+  const particles = Array.from({ length: count }, (_, i) => {
     const angle = (i / cfg.count) * Math.PI * 2 + Math.random() * 0.3
     const dist = cfg.spread * (0.5 + Math.random() * 0.5)
     return {
@@ -134,10 +138,12 @@ type Phase = 'idle' | 'waiting' | 'revealing' | 'revealed'
 type FlipHalf = 'none' | 'first' | 'second'
 
 export default function PullMachine({
-  initialTokens, initialPity, pityThreshold, pullCost, catConfig,
+  initialTokens, initialPity, pityThreshold, pullCost, catConfig, isAdmin = false, allCards = [], particleMultiplier = 1,
 }: {
   initialTokens: number; initialPity: number; pityThreshold: number; pullCost: number
   catConfig: { count: number; duration: number; volume: number }
+  isAdmin?: boolean; allCards?: AdminCard[]
+  particleMultiplier?: number
 }) {
   const [phase, setPhase] = useState<Phase>('idle')
   const [result, setResult] = useState<PullResult | null>(null)
@@ -158,6 +164,11 @@ export default function PullMachine({
   const [legendaryPop, setLegendaryPop] = useState(false)
   const [showChipi, setShowChipi] = useState(false)
 
+  // Admin force-pull state
+  const [adminOpen, setAdminOpen] = useState(false)
+  const [forceRarity, setForceRarity] = useState('')
+  const [forceCardId, setForceCardId] = useState('')
+
   const handlePull = useCallback(async () => {
     setError(null)
     setResult(null)
@@ -171,7 +182,9 @@ export default function PullMachine({
     setShowChipi(false)
     setPhase('waiting')
 
-    const res = await pullCardAction()
+    const res = (isAdmin && (forceRarity || forceCardId))
+      ? await adminForcePullAction({ forceRarity: forceRarity || undefined, forceCardId: forceCardId || undefined })
+      : await pullCardAction()
 
     if (res.error) {
       setPhase('idle')
@@ -240,7 +253,7 @@ export default function PullMachine({
     setTokenPop(true)
     await delay(400)
     setTokenPop(false)
-  }, [])
+  }, [isAdmin, forceRarity, forceCardId])
 
   const handleReset = useCallback(() => {
     setPhase('idle')
@@ -256,7 +269,8 @@ export default function PullMachine({
     setError(null)
   }, [])
 
-  const canPull = tokens >= pullCost
+  const isForcePull = isAdmin && (!!forceRarity || !!forceCardId)
+  const canPull = tokens >= pullCost || isForcePull
   const rarity = result?.card?.rarity ?? 'common'
 
   const cardTransition =
@@ -331,7 +345,7 @@ export default function PullMachine({
             {/* Effects overlay */}
             {showEffects && result?.card && (
               <div className="absolute inset-0 pointer-events-none">
-                <ParticleBurst rarity={rarity} />
+                <ParticleBurst rarity={rarity} multiplier={particleMultiplier} />
                 {(rarity === 'epic' || rarity === 'legendary') && <LightRays rarity={rarity} />}
               </div>
             )}
@@ -388,13 +402,78 @@ export default function PullMachine({
           )}
           <button onClick={handlePull} disabled={!canPull}
             className={`w-full py-5 rounded-2xl font-black text-xl tracking-widest transition-all active:scale-95 ${
-              canPull
-                ? 'bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white hover:shadow-2xl hover:shadow-violet-500/40 animate-glow-pulse'
-                : 'bg-gray-900 text-gray-700 border border-gray-800 cursor-not-allowed'
+              isForcePull
+                ? 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white hover:shadow-2xl hover:shadow-amber-500/40'
+                : canPull
+                  ? 'bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white hover:shadow-2xl hover:shadow-violet-500/40 animate-glow-pulse'
+                  : 'bg-gray-900 text-gray-700 border border-gray-800 cursor-not-allowed'
             }`}>
-            {canPull ? 'PULL' : 'NO TOKENS'}
+            {isForcePull ? 'FORCE PULL' : canPull ? 'PULL' : 'NO TOKENS'}
           </button>
-          <p className="text-gray-600 text-xs">costs {pullCost} token{pullCost !== 1 ? 's' : ''} per pull</p>
+          <p className="text-gray-600 text-xs">{isForcePull ? 'free · admin force pull' : `costs ${pullCost} token${pullCost !== 1 ? 's' : ''} per pull`}</p>
+
+          {/* Admin panel */}
+          {isAdmin && (
+            <div className="mt-1">
+              <button
+                type="button"
+                onClick={() => setAdminOpen(o => !o)}
+                className="text-gray-600 hover:text-gray-400 text-xs font-mono transition-colors"
+              >
+                {adminOpen ? '▾' : '▸'} admin
+              </button>
+              {adminOpen && (
+                <div className="mt-2 bg-gray-950 border border-gray-800 rounded-xl p-3 space-y-2 text-left">
+                  {/* Force rarity */}
+                  <div>
+                    <label className="text-gray-500 text-xs block mb-1">Force rarity</label>
+                    <select
+                      value={forceRarity}
+                      onChange={e => { setForceRarity(e.target.value); setForceCardId('') }}
+                      className="w-full bg-gray-900 border border-gray-700 rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-amber-500"
+                    >
+                      <option value="">— normal pull —</option>
+                      {RARITY_ORDER.map(r => (
+                        <option key={r} value={r}>{r.toUpperCase()}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {/* Force specific card */}
+                  <div>
+                    <label className="text-gray-500 text-xs block mb-1">Force specific card <span className="text-gray-700">(overrides rarity)</span></label>
+                    <select
+                      value={forceCardId}
+                      onChange={e => { setForceCardId(e.target.value); setForceRarity('') }}
+                      className="w-full bg-gray-900 border border-gray-700 rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-amber-500"
+                    >
+                      <option value="">— none —</option>
+                      {RARITY_ORDER.flatMap(r => {
+                        const group = allCards.filter(c => c.rarity === r)
+                        if (!group.length) return []
+                        return [
+                          <option key={`__${r}`} disabled className="text-gray-600">── {r.toUpperCase()} ──</option>,
+                          ...group.map(c => (
+                            <option key={c.id} value={c.id}>
+                              {c.character.name} — {c.variant_name}
+                            </option>
+                          )),
+                        ]
+                      })}
+                    </select>
+                  </div>
+                  {(forceRarity || forceCardId) && (
+                    <button
+                      type="button"
+                      onClick={() => { setForceRarity(''); setForceCardId('') }}
+                      className="text-gray-600 hover:text-gray-400 text-xs transition-colors"
+                    >
+                      ✕ clear
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

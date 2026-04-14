@@ -9,15 +9,17 @@ export default async function PullPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [profileRes, configRes] = await Promise.all([
-    supabaseAdmin.from('profiles').select('tokens, pity_counter').eq('id', user.id).single(),
-    supabaseAdmin.from('gacha_config').select('pull_cost, pity_threshold, legendary_cat_count, legendary_cat_duration, legendary_cat_volume').single(),
+  const [profileRes, configRes, cardsRes] = await Promise.all([
+    supabaseAdmin.from('profiles').select('tokens, pity_counter, is_admin').eq('id', user.id).single(),
+    supabaseAdmin.from('gacha_config').select('pull_cost, pity_threshold, legendary_cat_count, legendary_cat_duration, legendary_cat_volume, particle_multiplier').single(),
+    supabaseAdmin.from('cards').select('id, variant_name, rarity, character:characters(name)').order('rarity').order('variant_name'),
   ])
 
   const profile = profileRes.data
   const config  = configRes.data
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const cfg = config as any
+  const isAdmin = !!profile?.is_admin
 
   return (
     <>
@@ -33,6 +35,10 @@ export default async function PullPage() {
             duration: cfg?.legendary_cat_duration ?? 8,
             volume:   cfg?.legendary_cat_volume   ?? 0.4,
           }}
+          particleMultiplier={cfg?.particle_multiplier ?? 1.0}
+          isAdmin={isAdmin}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          allCards={isAdmin ? ((cardsRes.data ?? []) as any[]) : []}
         />
       </div>
     </>

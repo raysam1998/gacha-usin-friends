@@ -78,6 +78,7 @@ export default function ChipiCatOverlay({
     const audio = audioRef.current
     if (audio) {
       audio.volume = Math.min(1, Math.max(0, volume))
+      audio.playbackRate = 1.18
       audio.currentTime = 0
       audio.loop = true
       audio.play().catch(() => {})

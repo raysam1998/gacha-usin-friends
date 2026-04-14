@@ -43,6 +43,75 @@ const ERR = (msg: string, tokens = 0, pity = 0, threshold = 50, cost = 1): PullR
   newTokenCount: tokens, newPityCounter: pity, pityThreshold: threshold, pullCost: cost,
 })
 
+export async function adminForcePullAction(opts: {
+  forceRarity?: string
+  forceCardId?: string
+}): Promise<PullResult> {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return ERR('Not authenticated')
+
+  const [profileRes, configRes] = await Promise.all([
+    supabaseAdmin.from('profiles').select('is_admin, tokens, pity_counter').eq('id', user.id).single(),
+    supabaseAdmin.from('gacha_config').select('pity_threshold, pull_cost').single(),
+  ])
+
+  const profile = profileRes.data
+  const config  = configRes.data
+
+  if (!profile?.is_admin) return ERR('Admin only')
+
+  const pityThreshold = config?.pity_threshold ?? 50
+  const pullCost      = config?.pull_cost ?? 1
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let card: any = null
+
+  if (opts.forceCardId) {
+    const { data } = await supabaseAdmin
+      .from('cards')
+      .select('id, variant_name, rarity, image_url, character:characters(name)')
+      .eq('id', opts.forceCardId)
+      .single()
+    card = data
+  } else if (opts.forceRarity) {
+    const { data: pool } = await supabaseAdmin
+      .from('cards')
+      .select('id, variant_name, rarity, image_url, character:characters(name)')
+      .eq('rarity', opts.forceRarity)
+    if (pool && pool.length > 0) card = pool[Math.floor(Math.random() * pool.length)]
+  }
+
+  if (!card) return ERR('No matching card found', profile.tokens, profile.pity_counter, pityThreshold, pullCost)
+
+  const { data: existing } = await supabaseAdmin
+    .from('user_cards')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('card_id', card.id)
+    .maybeSingle()
+
+  const isDuplicate = !!existing
+  await supabaseAdmin.from('user_cards').insert({ user_id: user.id, card_id: card.id })
+
+  return {
+    error: null,
+    card: {
+      id: card.id,
+      variant_name: card.variant_name,
+      rarity: card.rarity,
+      image_url: card.image_url,
+      character: card.character,
+    },
+    isDuplicate,
+    isPityPull: false,
+    newTokenCount: profile.tokens,        // free — no deduction
+    newPityCounter: profile.pity_counter, // unchanged
+    pityThreshold,
+    pullCost,
+  }
+}
+
 export async function pullCardAction(): Promise<PullResult> {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()

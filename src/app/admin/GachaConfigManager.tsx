@@ -15,6 +15,7 @@ type Config = {
   legendary_cat_count: number
   legendary_cat_duration: number
   legendary_cat_volume: number
+  particle_multiplier: number
 }
 
 export default function GachaConfigManager({ config }: { config: Config }) {
@@ -24,6 +25,7 @@ export default function GachaConfigManager({ config }: { config: Config }) {
   const [previewCount,    setPreviewCount]    = useState(config.legendary_cat_count)
   const [previewDuration, setPreviewDuration] = useState(config.legendary_cat_duration)
   const [previewVolume,   setPreviewVolume]   = useState(config.legendary_cat_volume)
+  const [previewParticles, setPreviewParticles] = useState(config.particle_multiplier)
 
   return (
     <div className="glass rounded-xl p-6 space-y-4">
@@ -203,6 +205,22 @@ export default function GachaConfigManager({ config }: { config: Config }) {
               className="w-full accent-amber-400"
             />
             <div className="flex justify-between text-gray-700 text-xs mt-0.5"><span>0%</span><span>100%</span></div>
+          </div>
+
+          {/* Particle multiplier slider */}
+          <div>
+            <div className="flex justify-between mb-1">
+              <label className="text-gray-400 text-xs">Particle intensity</label>
+              <span className="text-amber-300 text-xs font-mono">{previewParticles.toFixed(1)}×</span>
+            </div>
+            <input
+              name="particle_multiplier"
+              type="range" min="0" max="3" step="0.1"
+              value={previewParticles}
+              onChange={e => setPreviewParticles(Number(e.target.value))}
+              className="w-full accent-amber-400"
+            />
+            <div className="flex justify-between text-gray-700 text-xs mt-0.5"><span>off</span><span>3×</span></div>
           </div>
 
           {/* Test button */}
