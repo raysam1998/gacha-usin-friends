@@ -43,7 +43,7 @@ export default async function AdminPage() {
   // Fetch gacha config
   const { data: gachaConfig } = await supabaseAdmin
     .from('gacha_config')
-    .select('daily_tokens, bonus_token_amount, bonus_token_interval_hours, auto_approve_votes, user_news_enabled, user_news_cooldown_minutes, user_news_auto_active')
+    .select('daily_tokens, bonus_token_amount, bonus_token_interval_hours, auto_approve_votes, user_news_enabled, user_news_cooldown_minutes, user_news_auto_active, legendary_cat_count, legendary_cat_duration, legendary_cat_volume')
     .single()
 
   const charactersWithCards = (characters ?? []).map((c) => ({
@@ -117,6 +117,12 @@ export default async function AdminPage() {
             user_news_cooldown_minutes: (gachaConfig as any)?.user_news_cooldown_minutes ?? 5,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             user_news_auto_active: (gachaConfig as any)?.user_news_auto_active ?? false,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            legendary_cat_count: (gachaConfig as any)?.legendary_cat_count ?? 8,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            legendary_cat_duration: (gachaConfig as any)?.legendary_cat_duration ?? 8,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            legendary_cat_volume: (gachaConfig as any)?.legendary_cat_volume ?? 0.4,
           }} />
 
           <div className="border-t border-gray-800 my-4" />

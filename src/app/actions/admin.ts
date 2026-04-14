@@ -295,12 +295,18 @@ export async function updateGachaConfigAction(
   const userNewsEnabled = formData.get('user_news_enabled') === 'true'
   const userNewsCooldown = parseInt(formData.get('user_news_cooldown_minutes') as string, 10)
   const userNewsAutoActive = formData.get('user_news_auto_active') === 'true'
+  const catCount    = parseInt(formData.get('legendary_cat_count') as string, 10)
+  const catDuration = parseInt(formData.get('legendary_cat_duration') as string, 10)
+  const catVolume   = parseFloat(formData.get('legendary_cat_volume') as string)
 
   if (isNaN(dailyTokens) || dailyTokens < 0) return { error: 'Invalid daily tokens', success: null }
   if (isNaN(bonusAmount) || bonusAmount < 0) return { error: 'Invalid bonus amount', success: null }
   if (isNaN(bonusMinutes) || bonusMinutes < 0) return { error: 'Invalid bonus interval', success: null }
   if (isNaN(autoApproveVotes) || autoApproveVotes < 1) return { error: 'Invalid auto-approve threshold', success: null }
   if (isNaN(userNewsCooldown) || userNewsCooldown < 1) return { error: 'Cooldown must be at least 1 minute', success: null }
+  if (isNaN(catCount)    || catCount < 1)              return { error: 'Cat count must be at least 1', success: null }
+  if (isNaN(catDuration) || catDuration < 1)           return { error: 'Duration must be at least 1s', success: null }
+  if (isNaN(catVolume)   || catVolume < 0)             return { error: 'Invalid volume', success: null }
 
   // gacha_config is a single-row table — update the first row
   const { data: cfg } = await supabaseAdmin.from('gacha_config').select('id').single()
@@ -314,6 +320,9 @@ export async function updateGachaConfigAction(
     user_news_enabled: userNewsEnabled,
     user_news_cooldown_minutes: userNewsCooldown,
     user_news_auto_active: userNewsAutoActive,
+    legendary_cat_count: catCount,
+    legendary_cat_duration: catDuration,
+    legendary_cat_volume: catVolume,
   }).eq('id', cfg.id)
 
   if (error) return { error: error.message, success: null }

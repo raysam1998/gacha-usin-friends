@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { pullCardAction, type PullResult } from '@/app/actions/gacha'
+import ChipiCatOverlay from '@/components/ChipiCatOverlay'
 
 // ── Config ────────────────────────────────────────────────────
 const HALF_FLIP_MS: Record<string, number> = {
@@ -133,9 +134,10 @@ type Phase = 'idle' | 'waiting' | 'revealing' | 'revealed'
 type FlipHalf = 'none' | 'first' | 'second'
 
 export default function PullMachine({
-  initialTokens, initialPity, pityThreshold, pullCost,
+  initialTokens, initialPity, pityThreshold, pullCost, catConfig,
 }: {
   initialTokens: number; initialPity: number; pityThreshold: number; pullCost: number
+  catConfig: { count: number; duration: number; volume: number }
 }) {
   const [phase, setPhase] = useState<Phase>('idle')
   const [result, setResult] = useState<PullResult | null>(null)
@@ -154,6 +156,7 @@ export default function PullMachine({
   const [showShake, setShowShake] = useState(false)
   const [showLegendaryFlash, setShowLegendaryFlash] = useState(false)
   const [legendaryPop, setLegendaryPop] = useState(false)
+  const [showChipi, setShowChipi] = useState(false)
 
   const handlePull = useCallback(async () => {
     setError(null)
@@ -165,6 +168,7 @@ export default function PullMachine({
     setShowShake(false)
     setShowLegendaryFlash(false)
     setLegendaryPop(false)
+    setShowChipi(false)
     setPhase('waiting')
 
     const res = await pullCardAction()
@@ -192,6 +196,7 @@ export default function PullMachine({
       await delay(200)
       setLegendaryPop(true)
       setShowFront(true)
+      setShowChipi(true)   // 🐱 cats invade as the card pops
       await delay(400)
       setShowEffects(true)
       setShowShake(true)
@@ -247,6 +252,7 @@ export default function PullMachine({
     setShowShake(false)
     setShowLegendaryFlash(false)
     setLegendaryPop(false)
+    setShowChipi(false)
     setError(null)
   }, [])
 
@@ -270,6 +276,15 @@ export default function PullMachine({
           }}
         />
       )}
+
+      {/* 🐱 Chipi Chipi Chapa Chapa overlay */}
+      <ChipiCatOverlay
+        isActive={showChipi}
+        catCount={catConfig.count}
+        duration={catConfig.duration}
+        volume={catConfig.volume}
+        onComplete={() => setShowChipi(false)}
+      />
 
       {/* Token + pity HUD */}
       <div className="w-full max-w-sm flex items-center justify-between mb-8">

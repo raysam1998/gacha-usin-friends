@@ -11,11 +11,13 @@ export default async function PullPage() {
 
   const [profileRes, configRes] = await Promise.all([
     supabaseAdmin.from('profiles').select('tokens, pity_counter').eq('id', user.id).single(),
-    supabaseAdmin.from('gacha_config').select('pull_cost, pity_threshold').single(),
+    supabaseAdmin.from('gacha_config').select('pull_cost, pity_threshold, legendary_cat_count, legendary_cat_duration, legendary_cat_volume').single(),
   ])
 
   const profile = profileRes.data
-  const config = configRes.data
+  const config  = configRes.data
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const cfg = config as any
 
   return (
     <>
@@ -26,6 +28,11 @@ export default async function PullPage() {
           initialPity={profile?.pity_counter ?? 0}
           pityThreshold={config?.pity_threshold ?? 50}
           pullCost={config?.pull_cost ?? 1}
+          catConfig={{
+            count:    cfg?.legendary_cat_count    ?? 8,
+            duration: cfg?.legendary_cat_duration ?? 8,
+            volume:   cfg?.legendary_cat_volume   ?? 0.4,
+          }}
         />
       </div>
     </>

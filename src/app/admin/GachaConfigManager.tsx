@@ -1,7 +1,8 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
 import { updateGachaConfigAction } from '@/app/actions/admin'
+import ChipiCatOverlay from '@/components/ChipiCatOverlay'
 
 type Config = {
   daily_tokens: number
@@ -11,10 +12,18 @@ type Config = {
   user_news_enabled: boolean
   user_news_cooldown_minutes: number
   user_news_auto_active: boolean
+  legendary_cat_count: number
+  legendary_cat_duration: number
+  legendary_cat_volume: number
 }
 
 export default function GachaConfigManager({ config }: { config: Config }) {
   const [state, action, pending] = useActionState(updateGachaConfigAction, null)
+  const [testCats, setTestCats] = useState(false)
+  // Live-preview sliders so the test button uses current values, not just saved ones
+  const [previewCount,    setPreviewCount]    = useState(config.legendary_cat_count)
+  const [previewDuration, setPreviewDuration] = useState(config.legendary_cat_duration)
+  const [previewVolume,   setPreviewVolume]   = useState(config.legendary_cat_volume)
 
   return (
     <div className="glass rounded-xl p-6 space-y-4">
@@ -140,6 +149,72 @@ export default function GachaConfigManager({ config }: { config: Config }) {
           </div>
         </div>
 
+        {/* Legendary animation — Chipi Chipi Chapa Chapa */}
+        <div className="border border-amber-900/40 rounded-lg p-4 space-y-3 bg-amber-950/10">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">🐱</span>
+            <div className="text-amber-300 text-xs font-bold uppercase tracking-wider">Legendary Animation</div>
+          </div>
+          <div className="text-gray-500 text-xs">Chipi Chipi Chapa Chapa — cats invade the screen on every legendary pull.</div>
+
+          {/* Cat count slider */}
+          <div>
+            <div className="flex justify-between mb-1">
+              <label className="text-gray-400 text-xs">Number of cats</label>
+              <span className="text-amber-300 text-xs font-mono">{previewCount}</span>
+            </div>
+            <input
+              name="legendary_cat_count"
+              type="range" min="1" max="20"
+              value={previewCount}
+              onChange={e => setPreviewCount(Number(e.target.value))}
+              className="w-full accent-amber-400"
+            />
+            <div className="flex justify-between text-gray-700 text-xs mt-0.5"><span>1</span><span>20</span></div>
+          </div>
+
+          {/* Duration slider */}
+          <div>
+            <div className="flex justify-between mb-1">
+              <label className="text-gray-400 text-xs">Duration (seconds)</label>
+              <span className="text-amber-300 text-xs font-mono">{previewDuration}s</span>
+            </div>
+            <input
+              name="legendary_cat_duration"
+              type="range" min="3" max="15"
+              value={previewDuration}
+              onChange={e => setPreviewDuration(Number(e.target.value))}
+              className="w-full accent-amber-400"
+            />
+            <div className="flex justify-between text-gray-700 text-xs mt-0.5"><span>3s</span><span>15s</span></div>
+          </div>
+
+          {/* Volume slider */}
+          <div>
+            <div className="flex justify-between mb-1">
+              <label className="text-gray-400 text-xs">Volume</label>
+              <span className="text-amber-300 text-xs font-mono">{Math.round(previewVolume * 100)}%</span>
+            </div>
+            <input
+              name="legendary_cat_volume"
+              type="range" min="0" max="1" step="0.05"
+              value={previewVolume}
+              onChange={e => setPreviewVolume(Number(e.target.value))}
+              className="w-full accent-amber-400"
+            />
+            <div className="flex justify-between text-gray-700 text-xs mt-0.5"><span>0%</span><span>100%</span></div>
+          </div>
+
+          {/* Test button */}
+          <button
+            type="button"
+            onClick={() => setTestCats(true)}
+            className="mt-1 bg-amber-600/20 hover:bg-amber-600/35 border border-amber-500/30 text-amber-300 text-xs font-bold px-4 py-2 rounded-lg transition-colors"
+          >
+            🐾 Test Animation
+          </button>
+        </div>
+
         {state?.error && (
           <div className="text-red-400 text-xs bg-red-900/20 border border-red-500/20 rounded-lg px-3 py-2">
             {state.error}
@@ -159,6 +234,15 @@ export default function GachaConfigManager({ config }: { config: Config }) {
           {pending ? 'Saving...' : 'Save Config'}
         </button>
       </form>
+
+      {/* Test overlay — outside the form so it doesn't interfere */}
+      <ChipiCatOverlay
+        isActive={testCats}
+        catCount={previewCount}
+        duration={previewDuration}
+        volume={previewVolume}
+        onComplete={() => setTestCats(false)}
+      />
     </div>
   )
 }
