@@ -1,6 +1,7 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { submitProposalAction } from '@/app/actions/proposals'
 
@@ -21,11 +22,28 @@ const raritySelected: Record<string, string> = {
 }
 
 export default function SubmitProposalForm({ characters }: { characters: Character[] }) {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [state, action, pending] = useActionState(submitProposalAction, { error: null, success: null })
   const [isNewChar, setIsNewChar] = useState(false)
   const [preview, setPreview] = useState<string | null>(null)
   const [selectedRarity, setSelectedRarity] = useState<string>('common')
+  const [dragOver, setDragOver] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (state.success) router.refresh()
+  }, [state.success, router])
+
+  const handleFile = (file: File | undefined) => {
+    if (!file) return
+    if (fileInputRef.current) {
+      const dt = new DataTransfer()
+      dt.items.add(file)
+      fileInputRef.current.files = dt.files
+    }
+    setPreview(URL.createObjectURL(file))
+  }
 
   if (state.success && open) {
     return (
@@ -100,14 +118,31 @@ export default function SubmitProposalForm({ characters }: { characters: Charact
           {/* Image */}
           <div>
             <label className="block text-xs text-gray-400 mb-1">Photo</label>
-            <input name="image" type="file" accept="image/*" required
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) setPreview(URL.createObjectURL(f)) }}
-              className="w-full text-sm text-gray-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-violet-600 file:text-white hover:file:bg-violet-500 cursor-pointer" />
-            {preview && (
-              <div className="mt-2 relative w-24 h-32 rounded-lg overflow-hidden border border-gray-700">
-                <Image src={preview} alt="preview" fill className="object-cover" />
-              </div>
-            )}
+            <input ref={fileInputRef} name="image" type="file" accept="image/*" required
+              onChange={(e) => handleFile(e.target.files?.[0])}
+              className="hidden" />
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFile(e.dataTransfer.files[0]) }}
+              className={`cursor-pointer rounded-xl border-2 border-dashed transition-colors p-4 text-center text-xs ${
+                dragOver
+                  ? 'border-violet-400 bg-violet-900/20 text-violet-300'
+                  : 'border-gray-700 text-gray-500 hover:border-violet-600 hover:text-gray-400'
+              }`}
+            >
+              {preview ? (
+                <div className="flex items-center gap-3">
+                  <div className="relative w-16 h-20 rounded-lg overflow-hidden border border-gray-700 shrink-0">
+                    <Image src={preview} alt="preview" fill className="object-cover" />
+                  </div>
+                  <span className="text-gray-400">Click or drop to change</span>
+                </div>
+              ) : (
+                <span>Drop image here or click to browse</span>
+              )}
+            </div>
           </div>
 
           {state.error && <p className="text-red-400 text-xs">{state.error}</p>}
